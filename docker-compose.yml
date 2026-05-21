@@ -3,25 +3,39 @@ version: '3'
 volumes:
   pg_data:
   static:
+  media:          # добавлен том для пользовательских файлов
 
 services:
   db:
     image: postgres:13
     volumes:
       - pg_data:/var/lib/postgresql/data
+    env_file: .env     # подключили .env для инициализации БД
+    # переменные в .env: POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD
+
   backend:
     build: ./backend/
     env_file: .env
+    volumes:
+      - static:/app/collected_static   # сюда Django соберёт статику админки
+      - media:/app/media               # сюда Django будет сохранять загруженные файлы
+    depends_on:
+      - db
+
   frontend:
     env_file: .env
     build: ./frontend/
     command: cp -r /app/build/. /static/
     volumes:
-      - static:/static
+      - static:/static    # после сборки копируем результат в том static
+
   gateway:
     build: ./nginx/
     env_file: .env
     ports:
       - 9000:80
     volumes:
-      - static:/static
+      - static:/static   # Nginx отдаёт статику (фронтенд + админка)
+      - media:/media     # Nginx отдаёт медиафайлы
+    depends_on:
+      - backend
